@@ -25,7 +25,7 @@ struct pixel {
 int IMAGE_HEIGHT;
 int IMAGE_WIDTH;
 Matrix3x3 TRANSFORM_MATRIX(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
-char *OUTPUT_FILENAME;
+char * OUTPUT_FILENAME;
 
 
 
@@ -186,6 +186,8 @@ void calculateRotationTransform (double theta) {
             TRANSFORM_MATRIX[row][col] = product_matrix[row][col];
         }
     }
+
+    cout << TRANSFORM_MATRIX;
 }
 
 
@@ -203,22 +205,58 @@ void calculateScaleTransform(double x_scale, double y_scale) {
 
 
 void calculateTranslateTransform(double x_translate, double y_translate) {
-    // stubbed
+    int row, col;
+    Matrix3x3 translate_matrix(1.0, 0.0, x_translate, 0.0, 1.0, y_translate, 0.0, 0.0, 1.0);
+
+    Matrix3x3 product_matrix = translate_matrix * TRANSFORM_MATRIX;
+    for(row = 0; row < 3; row++) {
+        for(col = 0; col < 3; col++) {
+            TRANSFORM_MATRIX[row][col] = product_matrix[row][col];
+        }
+    }
 }
 
 
 void calculateFlipTransform(int x_flip, int y_flip) {
-    // stubbed
+    int row, col;
+    Matrix3x3 flip_matrix(-1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0);
+
+    Matrix3x3 product_matrix = flip_matrix * TRANSFORM_MATRIX;
+    for(row = 0; row < 3; row++) {
+        for(col = 0; col < 3; col++) {
+            TRANSFORM_MATRIX[row][col] = product_matrix[row][col];
+        }
+    }
+
+    // figure it out
 }
 
 
 void calculateShearTransform(double x_shear, double y_shear) {
-    //stubbed
+    int row, col;
+    Matrix3x3 shear_matrix(1.0, x_shear, 0.0, y_shear, 1.0, 0.0, 0.0, 0.0, 1.0);
+
+    Matrix3x3 product_matrix = shear_matrix * TRANSFORM_MATRIX;
+    for(row = 0; row < 3; row++) {
+        for(col = 0; col < 3; col++) {
+            TRANSFORM_MATRIX[row][col] = product_matrix[row][col];
+        }
+    }
 }
 
 
 void calculatePerspectiveTransform(double x_perspective, double y_perspective) {
-    // stubbed
+    int row, col;
+    Matrix3x3 perspective_matrix(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, x_perspective, y_perspective, 1.0);
+
+
+    Matrix3x3 product_matrix = perspective_matrix * TRANSFORM_MATRIX;
+    for(row = 0; row < 3; row++) {
+        for(col = 0; col < 3; col++) {
+            TRANSFORM_MATRIX[row][col] = product_matrix[row][col];
+        }
+    }
+    // a31 a32
 }
 
 
@@ -238,37 +276,49 @@ void calculateTransformMatrix(string user_input) {
         cout << "\nRotation applied. ENTER next command (ENTER d when finished):\n";
         calculateRotationTransform(theta);
     }
-    else if (user_input.compare(0, 1, "s")) {
+    else if (user_input.compare(0, 1, "s") == 0) {
         string_stream >> temp >> x_scale >> y_scale;
 
         cout << "\nScale applied. ENTER next command (ENTER d when finished):\n";
         calculateScaleTransform(x_scale, y_scale);
     }
-    else if (user_input.compare(0, 1, "t")) {
+    else if (user_input.compare(0, 1, "t") == 0) {
         string_stream >> temp >> x_translate >> y_translate;
 
-        //calculateTranslateTransform(x_translate, y_translate)
+        cout << "\nTranslate applied. ENTER next command (ENTER d when finished):\n";
+        calculateTranslateTransform(x_translate, y_translate);
     }
-    else if (user_input.compare(0, 1, "f")) {
+    else if (user_input.compare(0, 1, "f") == 0) {
         string_stream >> temp >> x_flip >> y_flip;
 
-        //calculateFlipTransform(x_flip, y_flip);
+        cout << "\nFlip applied. ENTER next command (ENTER d when finished):\n";
+        calculateFlipTransform(x_flip, y_flip);
     }
-    else if (user_input.compare(0, 1, "h")) {
+    else if (user_input.compare(0, 1, "h") == 0) {
         string_stream >> temp >> x_shear >> y_shear;
 
-        //calculateShearTransform(x_shear, y_shear);
+        cout << "\nShear applied. ENTER next command (ENTER d when finished):\n";
+        calculateShearTransform(x_shear, y_shear);
     }
-    else if (user_input.compare(0, 1, "p")) {
+    else if (user_input.compare(0, 1, "p") == 0) {
         string_stream >> temp >> x_perspective >> y_perspective;
 
-        //calculatePerspectiveTransform(x_perspective, y_perspective);
+        cout << "\nPerspective applied. ENTER next command (ENTER d when finished):\n";
+        calculatePerspectiveTransform(x_perspective, y_perspective);
     }
+}
+
+pixel ** createNewImage (pixel ** pixmap) {
+    pixel ** transformed_pixmap;
+    initializePixmap(transformed_pixmap);
+
+
 }
 
 int main(int argc, char *argv[]) {
     char *output_file_name;
     pixel ** pixmap;
+    pixel ** transformed_pixmap;
     string user_input = "null"; // initialize string to a word that does not start with the letter 'd'
 
     // check for valid argument values
@@ -279,13 +329,20 @@ int main(int argc, char *argv[]) {
         OUTPUT_FILENAME = argv[2];
 
     // read the input image
-    readImage(argv[1]);
+    pixmap = readImage(argv[1]);
 
     // Get user input and build transformation matrix
     while(user_input.compare(0, 1, "d") != 0) {
         getline(cin,user_input);
         calculateTransformMatrix(user_input);
+        cout << TRANSFORM_MATRIX << "\n";
     }
+
+    cout << "\nDone transforming matrix\nFinal transform matrix is:\n";
+    cout << TRANSFORM_MATRIX;
+
+    // create a new image based on the forward transform of the corners of the input image
+    createNewImage(pixmap);
 
     if (argc == 3) // specified output file
         writeImage(pixmap, argv[2], IMAGE_WIDTH, IMAGE_HEIGHT);
