@@ -312,21 +312,30 @@ void getNewImageDimensions () {
     int transformed_min_width, transformed_min_height;
 
     Vector3d bottom_left_corner(0, 0, 1.0);
-    Vector3d bottom_right_corner(IMAGE_WIDTH - 1.0, 1.0);
+    Vector3d bottom_right_corner(IMAGE_WIDTH - 1.0, 0.0, 1.0);
     Vector3d top_left_corner(0, IMAGE_HEIGHT - 1, 1.0);
     Vector3d top_right_corner(IMAGE_WIDTH, IMAGE_HEIGHT, 1.0);
 
+    cout << "\nCorners of transformed image\n";
+    cout << bottom_left_corner << " " << top_left_corner << " " << top_right_corner << " " << bottom_right_corner;
+
     // get transformed corners
     Vector3d transformed_bottom_left_corner = TRANSFORM_MATRIX * bottom_left_corner;
-    Vector3d transformed_bottom_right_corner = TRANSFORM_MATRIX * bottom_left_corner;
-    Vector3d transformed_top_left_corner = TRANSFORM_MATRIX * bottom_left_corner;
-    Vector3d transformed_top_right_corner = TRANSFORM_MATRIX * bottom_left_corner;
+    Vector3d transformed_bottom_right_corner = TRANSFORM_MATRIX * bottom_right_corner;
+    Vector3d transformed_top_left_corner = TRANSFORM_MATRIX * top_left_corner;
+    Vector3d transformed_top_right_corner = TRANSFORM_MATRIX * top_right_corner;
+
+    cout << "\nCorners of transformed image\n";
+    cout << transformed_bottom_left_corner << " " << transformed_top_left_corner << " " << transformed_top_right_corner << " " << transformed_bottom_right_corner;
 
     // normalize transformed corners
     transformed_bottom_left_corner = transformed_bottom_left_corner / transformed_bottom_left_corner[2];
     transformed_bottom_right_corner = transformed_bottom_right_corner / transformed_bottom_right_corner[2];
     transformed_top_left_corner = transformed_top_left_corner / transformed_top_left_corner[2];
     transformed_top_right_corner = transformed_top_right_corner / transformed_top_right_corner[2];
+
+    cout << "\nCorners of transformed image after normalization\n";
+    cout << transformed_bottom_left_corner << " " << transformed_top_left_corner << " " << transformed_top_right_corner << " " << transformed_bottom_right_corner;
 
     // get max and min width and height
     transformed_max_width = (int) max(max(transformed_bottom_left_corner[0], transformed_bottom_right_corner[0]),
@@ -340,6 +349,8 @@ void getNewImageDimensions () {
 
     transformed_min_height = (int) min(min(transformed_bottom_left_corner[1], transformed_bottom_right_corner[1]),
                                        min(transformed_top_left_corner[1], transformed_top_right_corner[1]));
+    cout << "\ntransformed max and min height and width\n";
+    cout << transformed_max_width << " " << transformed_max_height << " " << transformed_min_width << " " << transformed_min_height << "\n";
 
     // calculate new image width and height
     NEW_IMAGE_WIDTH = abs(transformed_max_width - transformed_min_width);
@@ -348,7 +359,13 @@ void getNewImageDimensions () {
 
 
 void populateTransformedPixmap(pixel ** &pixmap) {
-    // stubbed
+    for (int row = 0; row < NEW_IMAGE_HEIGHT; row++)
+        for (int col = 0; col < NEW_IMAGE_WIDTH; col++) {
+            TRANSFORMED_PIXMAP[row][col].r = 0;
+            TRANSFORMED_PIXMAP[row][col].g = 0;
+            TRANSFORMED_PIXMAP[row][col].b = 0;
+            TRANSFORMED_PIXMAP[row][col].a = 1;
+        }
 }
 
 
@@ -362,7 +379,7 @@ void drawImage() {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glRasterPos2i(0,0);
-    glDrawPixels(IMAGE_WIDTH, IMAGE_HEIGHT, GL_RGBA, GL_FLOAT, TRANSFORMED_PIXMAP[0]);
+    glDrawPixels(NEW_IMAGE_WIDTH, NEW_IMAGE_HEIGHT, GL_RGBA, GL_FLOAT, TRANSFORMED_PIXMAP[0]);
     glFlush();
 }
 
@@ -389,8 +406,8 @@ void openGlInit(int argc, char* argv[]) {
 
     // create the graphics window, giving width, height, and title text
     glutInitDisplayMode(GLUT_SINGLE | GLUT_RGBA);
-    glutInitWindowSize(IMAGE_WIDTH, IMAGE_HEIGHT);
-    glutCreateWindow("Tonemap Result");
+    glutInitWindowSize(NEW_IMAGE_WIDTH, NEW_IMAGE_HEIGHT);
+    glutCreateWindow("Warp Result");
 
     // set up the callback routines to be called when glutMainLoop() detects
     // an event
@@ -401,7 +418,7 @@ void openGlInit(int argc, char* argv[]) {
     // lower left is (0, 0), upper right is (WIDTH, HEIGHT)
     glMatrixMode(GL_PROJECTION);
     glLoadIdentity();
-    gluOrtho2D(0, IMAGE_WIDTH, 0, IMAGE_HEIGHT);
+    gluOrtho2D(0, NEW_IMAGE_WIDTH, 0, NEW_IMAGE_HEIGHT);
 
     // specify window clear (background) color to be opaque white
     glClearColor(1, 1, 1, 0);
@@ -442,10 +459,18 @@ int main(int argc, char *argv[]) {
     getNewImageDimensions();
     initializePixmap(TRANSFORMED_PIXMAP, NEW_IMAGE_WIDTH, NEW_IMAGE_HEIGHT);
 
-    // populateTransformedPixmap(TRANSFORMED_PIXMAP);
+    // old width and height
+    cout << "\nOld Image Width and Height\n";
+    cout << IMAGE_WIDTH << " " << IMAGE_HEIGHT << " " << endl;
+
+    // new width and height
+    cout << "\nNew Image Width and Height.\n";
+    cout << NEW_IMAGE_WIDTH << " " << NEW_IMAGE_HEIGHT << endl;
+
+    populateTransformedPixmap(TRANSFORMED_PIXMAP);
 
     if (argc == 3) // specified output file
-        writeImage(pixmap, argv[2], IMAGE_WIDTH, IMAGE_HEIGHT);
+        writeImage(TRANSFORMED_PIXMAP, argv[2], NEW_IMAGE_WIDTH, NEW_IMAGE_HEIGHT);
 
     openGlInit(argc, argv);
     return 0;
