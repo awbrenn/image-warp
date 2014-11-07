@@ -24,9 +24,11 @@ struct pixel {
 // Global Variable Declarations
 int IMAGE_HEIGHT;
 int IMAGE_WIDTH;
+int NEW_IMAGE_HEIGHT;
+int NEW_IMAGE_WIDTH;
 Matrix3x3 TRANSFORM_MATRIX(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
 char * OUTPUT_FILENAME;
-
+pixel ** TRANSFORMED_PIXMAP;
 
 
 /* Handles errors
@@ -44,12 +46,12 @@ void handleError (string message, bool kill) {
 /*
     Initializes a pixmap and sets it up for double array syntax for accessing elements
  */
-void initializePixmap(pixel ** &pixmap) {
-    pixmap = new pixel*[IMAGE_HEIGHT];
-    pixmap[0] = new pixel[IMAGE_WIDTH * IMAGE_HEIGHT];
+void initializePixmap(pixel ** &pixmap, int image_width, int image_height) {
+    pixmap = new pixel*[image_height];
+    pixmap[0] = new pixel[image_width * image_height];
 
-    for (int i = 1; i < IMAGE_HEIGHT; i++)
-        pixmap[i] = pixmap[i - 1] + IMAGE_WIDTH;
+    for (int i = 1; i < image_height; i++)
+        pixmap[i] = pixmap[i - 1] + image_width;
 }
 
 
@@ -58,7 +60,7 @@ void initializePixmap(pixel ** &pixmap) {
  */
 void flipImageVertical(float *&pixmap_vertical_flip, int height, int width, int channels) {
     pixel ** temp_pixmap;
-    initializePixmap(temp_pixmap);
+    initializePixmap(temp_pixmap, IMAGE_WIDTH, IMAGE_HEIGHT);
 
     int i = 0;
     for (int row = height-1; row >= 0; row--)
@@ -89,7 +91,7 @@ void flipImageVertical(float *&pixmap_vertical_flip, int height, int width, int 
  */
 pixel ** convertVectorToImage (vector<float> vector_pixels, int channels) {
     pixel ** image;
-    initializePixmap(image);
+    initializePixmap(image, IMAGE_WIDTH, IMAGE_HEIGHT);
 
     int i = 0;
     if (channels == 3) {
@@ -186,8 +188,6 @@ void calculateRotationTransform (double theta) {
             TRANSFORM_MATRIX[row][col] = product_matrix[row][col];
         }
     }
-
-    cout << TRANSFORM_MATRIX;
 }
 
 
@@ -227,8 +227,6 @@ void calculateFlipTransform(int x_flip, int y_flip) {
             TRANSFORM_MATRIX[row][col] = product_matrix[row][col];
         }
     }
-
-    // figure it out
 }
 
 
@@ -308,17 +306,103 @@ void calculateTransformMatrix(string user_input) {
     }
 }
 
-pixel ** createNewImage (pixel ** pixmap) {
-    pixel ** transformed_pixmap;
-    initializePixmap(transformed_pixmap);
 
+void getNewImageDimensions () {
+    int transformed_max_width, transformed_max_height;
+    int transformed_min_width, transformed_min_height;
+    int new_height, new_width;
 
+    Vector3d bottom_left_corner(0, 0, 1.0);
+    Vector3d bottom_right_corner(IMAGE_WIDTH - 1.0, 1.0);
+    Vector3d top_left_corner(0, IMAGE_HEIGHT - 1, 1.0);
+    Vector3d top_right_corner(IMAGE_WIDTH, IMAGE_HEIGHT, 1.0);
+
+    // get transformed corners
+    Vector3d transformed_bottom_left_corner = TRANSFORM_MATRIX * bottom_left_corner;
+    Vector3d transformed_bottom_right_corner = TRANSFORM_MATRIX * bottom_left_corner;
+    Vector3d transformed_top_left_corner = TRANSFORM_MATRIX * bottom_left_corner;
+    Vector3d transformed_top_right_corner = TRANSFORM_MATRIX * bottom_left_corner;
+
+    // normalize transformed corners
+    transformed_bottom_left_corner = transformed_bottom_left_corner / transformed_bottom_left_corner[2];
+    transformed_bottom_right_corner = transformed_bottom_right_corner / transformed_bottom_right_corner[2];
+    transformed_top_left_corner = transformed_top_left_corner / transformed_top_left_corner[2];
+    transformed_top_right_corner = transformed_top_right_corner / transformed_top_right_corner[2];
+
+    // get max and min width and height
+    transformed_max_width = (int) max(max(transformed_bottom_left_corner[0], transformed_bottom_right_corner[0]),
+                                     max(transformed_top_left_corner[0], transformed_top_right_corner[0]));
+
+    transformed_max_height = (int) max(max(transformed_bottom_left_corner[1], transformed_bottom_right_corner[1]),
+                                     max(transformed_top_left_corner[1], transformed_top_right_corner[1]));
+
+    transformed_min_width = (int) min(min(transformed_bottom_left_corner[0], transformed_bottom_right_corner[0]),
+                                       min(transformed_top_left_corner[0], transformed_top_right_corner[0]));
+
+    transformed_min_height = (int) min(min(transformed_bottom_left_corner[1], transformed_bottom_right_corner[1]),
+                                       min(transformed_top_left_corner[1], transformed_top_right_corner[1]));
+
+    // calculate new image width and height
+    NEW_IMAGE_WIDTH = abs(transformed_max_width - transformed_min_width);
+    NEW_IMAGE_HEIGHT = abs(transformed_max_height - transformed_min_height);
 }
+
+
+void populateTransformedPixmap(pixel ** &pixmap) {
+    // stubbed
+}
+
+
+/* Draw Image to opengl display
+ * input		- None
+ * output		- None
+ * side effect	- draws image to opengl display window
+ */
+void drawImage() {
+    glClear(GL_COLOR_BUFFER_BIT);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glRasterPos2i(0,0);
+    glDrawPixels(IMAGE_WIDTH, IMAGE_HEIGHT, GL_RGBA, GL_FLOAT, TRANSFORMED_PIXMAP[0]);
+    glFlush();
+}
+
+
+/* Initialize opengl
+ * input	- command line arguments
+ * output	- none
+ */
+void openGlInit(int argc, char* argv[]) {
+    // start up the glut utilities
+    glutInit(&argc, argv);
+
+    // create the graphics window, giving width, height, and title text
+    glutInitDisplayMode(GLUT_SINGLE | GLUT_RGBA);
+    glutInitWindowSize(IMAGE_WIDTH, IMAGE_HEIGHT);
+    glutCreateWindow("Tonemap Result");
+
+    // set up the callback routines to be called when glutMainLoop() detects
+    // an event
+    glutDisplayFunc(drawImage);		  		// display callback
+
+    // define the drawing coordinate system on the viewport
+    // lower left is (0, 0), upper right is (WIDTH, HEIGHT)
+    glMatrixMode(GL_PROJECTION);
+    glLoadIdentity();
+    gluOrtho2D(0, IMAGE_WIDTH, 0, IMAGE_HEIGHT);
+
+    // specify window clear (background) color to be opaque white
+    glClearColor(1, 1, 1, 0);
+
+    // Routine that loops forever looking for events. It calls the registered
+    // callback routine to handle each event that is detected
+    glutMainLoop();
+}
+
 
 int main(int argc, char *argv[]) {
     char *output_file_name;
     pixel ** pixmap;
-    pixel ** transformed_pixmap;
     string user_input = "null"; // initialize string to a word that does not start with the letter 'd'
 
     // check for valid argument values
@@ -336,16 +420,21 @@ int main(int argc, char *argv[]) {
         getline(cin,user_input);
         calculateTransformMatrix(user_input);
         cout << TRANSFORM_MATRIX << "\n";
+
     }
 
     cout << "\nDone transforming matrix\nFinal transform matrix is:\n";
     cout << TRANSFORM_MATRIX;
 
     // create a new image based on the forward transform of the corners of the input image
-    createNewImage(pixmap);
+    getNewImageDimensions();
+    initializePixmap(TRANSFORMED_PIXMAP, NEW_IMAGE_WIDTH, NEW_IMAGE_HEIGHT);
+
+    // populateTransformedPixmap(TRANSFORMED_PIXMAP);
 
     if (argc == 3) // specified output file
         writeImage(pixmap, argv[2], IMAGE_WIDTH, IMAGE_HEIGHT);
 
+    openGlInit(argc, argv);
     return 0;
 }
