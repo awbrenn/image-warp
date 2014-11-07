@@ -310,7 +310,6 @@ void calculateTransformMatrix(string user_input) {
 void getNewImageDimensions () {
     int transformed_max_width, transformed_max_height;
     int transformed_min_width, transformed_min_height;
-    int new_height, new_width;
 
     Vector3d bottom_left_corner(0, 0, 1.0);
     Vector3d bottom_right_corner(IMAGE_WIDTH - 1.0, 1.0);
@@ -368,6 +367,18 @@ void drawImage() {
 }
 
 
+/* Key press handler
+ * input	- Handled by opengl, because this is a callback function.
+ * output	- None
+ */
+void handleKey(unsigned char key, int x, int y) {
+    if (key == 'q' || key == 'Q') {
+        cout << "\nProgram Terminated." << endl;
+        exit(0);
+    }
+}
+
+
 /* Initialize opengl
  * input	- command line arguments
  * output	- none
@@ -384,6 +395,7 @@ void openGlInit(int argc, char* argv[]) {
     // set up the callback routines to be called when glutMainLoop() detects
     // an event
     glutDisplayFunc(drawImage);		  		// display callback
+    glutKeyboardFunc(handleKey);	  		// keyboard callback
 
     // define the drawing coordinate system on the viewport
     // lower left is (0, 0), upper right is (WIDTH, HEIGHT)
