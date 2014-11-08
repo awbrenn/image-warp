@@ -29,6 +29,7 @@ int NEW_IMAGE_WIDTH;
 Matrix3x3 TRANSFORM_MATRIX(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
 char * OUTPUT_FILENAME;
 pixel ** TRANSFORMED_PIXMAP;
+Vector3d TRANSFORMED_ORIGIN(0.0, 0.0, 0.0);
 
 
 /* Handles errors
@@ -167,6 +168,9 @@ void writeImage (pixel ** &pixmap, char * output_file_name, int window_width, in
 }
 
 
+/*
+    adjusts tranform matrix for a rotation
+ */
 void calculateRotationTransform (double theta) {
     int row, col;
     Matrix3x3 rotation_matrix(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
@@ -191,6 +195,9 @@ void calculateRotationTransform (double theta) {
 }
 
 
+/*
+    adjusts tranform matrix for a scale
+ */
 void calculateScaleTransform(double x_scale, double y_scale) {
     int row, col;
     Matrix3x3 scale_matrix(x_scale, 0.0, 0.0, 0.0, y_scale, 0.0, 0.0, 0.0, 1.0);
@@ -204,6 +211,9 @@ void calculateScaleTransform(double x_scale, double y_scale) {
 }
 
 
+/*
+    adjusts tranform matrix for a translate
+ */
 void calculateTranslateTransform(double x_translate, double y_translate) {
     int row, col;
     Matrix3x3 translate_matrix(1.0, 0.0, x_translate, 0.0, 1.0, y_translate, 0.0, 0.0, 1.0);
@@ -217,9 +227,15 @@ void calculateTranslateTransform(double x_translate, double y_translate) {
 }
 
 
+/*
+    adjusts tranform matrix for a flip
+ */
 void calculateFlipTransform(int x_flip, int y_flip) {
     int row, col;
-    Matrix3x3 flip_matrix(-1.0, 0.0, 0.0, 0.0, -1.0, 0.0, 0.0, 0.0, 1.0);
+    Matrix3x3 flip_matrix(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, 0.0, 0.0, 1.0);
+
+    if (x_flip == 1) flip_matrix[0][0] = -1.0;
+    if (y_flip == 1) flip_matrix[1][1] = -1.0;
 
     Matrix3x3 product_matrix = flip_matrix * TRANSFORM_MATRIX;
     for(row = 0; row < 3; row++) {
@@ -230,6 +246,9 @@ void calculateFlipTransform(int x_flip, int y_flip) {
 }
 
 
+/*
+    adjusts tranform matrix for a shear
+ */
 void calculateShearTransform(double x_shear, double y_shear) {
     int row, col;
     Matrix3x3 shear_matrix(1.0, x_shear, 0.0, y_shear, 1.0, 0.0, 0.0, 0.0, 1.0);
@@ -243,6 +262,9 @@ void calculateShearTransform(double x_shear, double y_shear) {
 }
 
 
+/*
+    adjusts tranform matrix for a perspective
+ */
 void calculatePerspectiveTransform(double x_perspective, double y_perspective) {
     int row, col;
     Matrix3x3 perspective_matrix(1.0, 0.0, 0.0, 0.0, 1.0, 0.0, x_perspective, y_perspective, 1.0);
@@ -254,10 +276,12 @@ void calculatePerspectiveTransform(double x_perspective, double y_perspective) {
             TRANSFORM_MATRIX[row][col] = product_matrix[row][col];
         }
     }
-    // a31 a32
 }
 
 
+/*
+    Control logic for different input strings
+ */
 void calculateTransformMatrix(string user_input) {
     double theta;
     double x_scale, y_scale;
@@ -307,6 +331,10 @@ void calculateTransformMatrix(string user_input) {
 }
 
 
+/*
+    Gets the dimensions of the new image by performing a forward map on the four corners of the original image.
+    The max and min height and width values are used to get the dimensions of the new image.
+ */
 void getNewImageDimensions () {
     int transformed_max_width, transformed_max_height;
     int transformed_min_width, transformed_min_height;
@@ -352,19 +380,47 @@ void getNewImageDimensions () {
     cout << "\ntransformed max and min height and width\n";
     cout << transformed_max_width << " " << transformed_max_height << " " << transformed_min_width << " " << transformed_min_height << "\n";
 
+    // set global transformed origin
+    TRANSFORMED_ORIGIN[0] = transformed_min_width;
+    TRANSFORMED_ORIGIN[1] = transformed_min_height;
+
     // calculate new image width and height
     NEW_IMAGE_WIDTH = abs(transformed_max_width - transformed_min_width);
     NEW_IMAGE_HEIGHT = abs(transformed_max_height - transformed_min_height);
 }
 
 
+/*
+    Populates new image by performing an inverse map on the original image
+ */
 void populateTransformedPixmap(pixel ** &pixmap) {
-    for (int row = 0; row < NEW_IMAGE_HEIGHT; row++)
+
+    Matrix3x3 inverse_matrix = TRANSFORM_MATRIX.inv();
+
+    cout << "\nCalculated Inverse Matrix:\n";
+    cout << inverse_matrix;
+
+     for (int row = 0; row < NEW_IMAGE_HEIGHT; row++)
         for (int col = 0; col < NEW_IMAGE_WIDTH; col++) {
-            TRANSFORMED_PIXMAP[row][col].r = 0;
-            TRANSFORMED_PIXMAP[row][col].g = 0;
-            TRANSFORMED_PIXMAP[row][col].b = 0;
-            TRANSFORMED_PIXMAP[row][col].a = 1;
+            Vector3d pixel_out(col, row, 1.0);
+            pixel_out = pixel_out + TRANSFORMED_ORIGIN;
+            Vector3d pixel_in = inverse_matrix * pixel_out;
+
+            // normalize the pixmap
+            float u = (float) pixel_in[0] / pixel_in[2];
+            float v = (float) pixel_in[1] / pixel_in[2];
+
+
+            // basic interpolation
+            if ((int) round(v) > (IMAGE_HEIGHT - 1) or (int) round(u) > (IMAGE_WIDTH - 1) or
+                    (int) round(v) < 0 or (int) round(u) < 0) {
+                TRANSFORMED_PIXMAP[row][col].r = 0.0;
+                TRANSFORMED_PIXMAP[row][col].g = 0.0;
+                TRANSFORMED_PIXMAP[row][col].b = 0.0;
+                TRANSFORMED_PIXMAP[row][col].a = 0.0;
+            }
+            else
+                TRANSFORMED_PIXMAP[row][col] = pixmap[(int)round(v)][(int)round(u)];
         }
 }
 
@@ -467,7 +523,7 @@ int main(int argc, char *argv[]) {
     cout << "\nNew Image Width and Height.\n";
     cout << NEW_IMAGE_WIDTH << " " << NEW_IMAGE_HEIGHT << endl;
 
-    populateTransformedPixmap(TRANSFORMED_PIXMAP);
+    populateTransformedPixmap(pixmap);
 
     if (argc == 3) // specified output file
         writeImage(TRANSFORMED_PIXMAP, argv[2], NEW_IMAGE_WIDTH, NEW_IMAGE_HEIGHT);
