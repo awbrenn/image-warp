@@ -1,0 +1,46 @@
+Lab 07
+Author:   Austin Brennan
+Email:    awbrenn@g.clemson.edu
+Class:    CPSC 4040 - Levine
+Due Date: November 7th, 2014
+
+------
+warper
+------
+
+Program Description:
+    The program reads in user input to build a tranform matrix. Once the user presses d (done)
+    the program calculates the tranformed image and displays it in an OpenGL display window.
+    If an output file was specified in the command line arguments, the program will write the
+    image to the specified file.
+
+
+Compilation:
+    $> make
+
+
+Use Cases:
+    $> ./warper input.img [output.img]
+
+
+Command Line Commands:
+    Once the program is running the following command line commands will manipulate the transform the
+    matrix accordingly.
+
+    All commands accept floating point numbers except for the f command which takes integer values.
+
+    r θ         - counter clockwise rotation about image origin, θ in degrees
+    s sx sy     - scale (watch out for scale by 0!)
+    t dx dy     - translate
+    f xf yf     - flip - if xf = 1 flip x coordinates, yf = 1 flip y coordinates
+    h hx hy     - shear
+    p px py     - perspective
+    d           - done
+
+
+Known Bugs:
+    - N/A
+
+
+Additional Information:
+    - Nothing in the advanced section is implemented.
